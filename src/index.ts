@@ -62,6 +62,34 @@ export default {
 					answer: result.text || 'N/A',
 				});
 			}
+			case 'BASIC_TOOL_CALL': {
+				if (!env.DEV_SHOWDOWN_API_KEY) {
+					throw new Error('DEV_SHOWDOWN_API_KEY is required');
+				}
+				const workshopLlm = createWorkshopLlm(env.DEV_SHOWDOWN_API_KEY, interactionId);
+				const cityResponse = await generateText({
+					model: workshopLlm.chatModel('deli-4'),
+					system: 'You are a helpful assistant that extracts the city from a question. If the city is not mentioned, respond with "Unknown".',
+					prompt: payload.question,
+				});
+				const city = cityResponse.text?.trim() || 'Unknown';
+				const weatherResponse = await fetch('https://devshowdown.com/api/weather', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ city }),
+				});
+				const chatResponse = await generateText({
+					model: workshopLlm.chatModel('deli-4'),
+					system: 'You are a helpful assistant that provides weather information. Use the provided weather data to answer the user\'s question.',
+					prompt: `User's question: ${payload.question}\nExtracted city: ${city}\nWeather data: ${await weatherResponse.text()}`,
+				});
+				return Response.json({
+					answer: chatResponse.text || 'N/A',
+				});
+
+			}
 			default:
 				return new Response('Solver not found', { status: 404 });
 		}
