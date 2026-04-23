@@ -48,11 +48,25 @@ export default {
 					answer: result.text || 'N/A',
 				});
 			}
-				default:
-					return new Response('Solver not found', { status: 404 });
+			case 'JSON_MODE': {
+				if (!env.DEV_SHOWDOWN_API_KEY) {
+					throw new Error('DEV_SHOWDOWN_API_KEY is required');
+				}
+				const workshopLlm = createWorkshopLlm(env.DEV_SHOWDOWN_API_KEY, interactionId);
+				const result = await generateText({
+					model: workshopLlm.chatModel('deli-4'),
+					system: 'You will be given a human-readable description of a product and must return the extracted data as a JSON object. The wording and sentence order will vary, but every required fact is present in the text. You must return: name, price, currency,inStock,dimensions, manufacturer, specifications',
+					prompt: payload.question,
+				});
+				return Response.json({
+					answer: result.text || 'N/A',
+				});
 			}
-		},
-	} satisfies ExportedHandler<Env>;
+			default:
+				return new Response('Solver not found', { status: 404 });
+		}
+	},
+} satisfies ExportedHandler<Env>;
 
 function createWorkshopLlm(apiKey: string, interactionId: string) {
 	return createOpenAICompatible({
